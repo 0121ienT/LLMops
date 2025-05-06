@@ -4,16 +4,22 @@ repos:
     rev: v4.4.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^open-webui/
       - id: end-of-file-fixer
+        exclude: ^open-webui/
       - id: check-yaml
+        exclude: ^open-webui/
       - id: check-added-large-files
+        exclude: ^open-webui/
 
   - repo: https://github.com/psf/black
     rev: 24.3.0
     hooks:
       - id: black
+        exclude: ^open-webui/
 
   - repo: https://github.com/PyCQA/flake8
     rev: 6.1.0
     hooks:
       - id: flake8
+        exclude: ^open-webui/
