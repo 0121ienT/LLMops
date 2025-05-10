@@ -16,10 +16,10 @@ repos:
     rev: 24.3.0
     hooks:
       - id: black
-        exclude: ^open-webui/
+        exclude: ^(open-webui/|.*__init__\.py$)
 
   - repo: https://github.com/PyCQA/flake8
     rev: 6.1.0
     hooks:
       - id: flake8
-        exclude: ^open-webui/
+        exclude: ^(open-webui/|.*__init__\.py$)

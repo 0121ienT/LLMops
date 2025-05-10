@@ -129,12 +129,18 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv-dev
+.venv-production
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+*.log
+
+/lightrag/rag_storage
+/lightrag/data
 
 # Spyder project settings
 .spyderproject
