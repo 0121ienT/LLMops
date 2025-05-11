@@ -1,51 +1,71 @@
 import os
+import logging
+import textract
 import asyncio
-from lightrag import LightRAG, QueryParam
-from lightrag.llm.openai import gpt_4o_mini_complete, openai_embed
-from lightrag.llm.ollama import ollama_model_complete, ollama_embedding
-from lightrag.kg.shared_storage import initialize_pipeline_status
-from lightrag.utils import setup_logger, EmbeddingFunc
-
-setup_logger("lightrag", level="INFO")
-
-WORKING_DIR = "./lightrag/rag_storage"
-if not os.path.exists(WORKING_DIR):
-    os.mkdir(WORKING_DIR)
+from dotenv import load_dotenv
+from model import openai_initialize_rag
+from lightrag.utils import setup_logger, TokenTracker
+from lightrag.base import QueryParam
 
 
-async def initialize_rag():
-    gpt_4o_mini_complete, openai_embed
-    rag = LightRAG(
-        working_dir=WORKING_DIR,
-        llm_model_func=ollama_model_complete,
-        llm_model_name="llama3.2",
-        llm_model_kwargs={"options": {"num_ctx": 32768}},
-        graph_storage="Neo4JStorage",
-        embedding_func=EmbeddingFunc(
-            embedding_dim=768,
-            max_token_size=8192,
-            func=lambda texts: ollama_embedding(texts, embed_model="bge-m3"),
-        ),
-    )
-    await rag.initialize_storages()
-    await initialize_pipeline_status()
-    return rag
+load_dotenv()
+
+setup_logger("lightrag", level="INFO", log_file_path="./logs/lightrag.log")
+
+logging.basicConfig(level=logging.INFO)
 
 
 async def main():
+    rag = await openai_initialize_rag()
+    token_tracker = TokenTracker()
+    init_number_files = 0
     try:
-        rag = await initialize_rag()
-        rag.insert("I want to be an AI engineer")
+        data_folder_path = os.getenv("DATA_DIR")
+        logging.info("Extracting Information in Data Folder...")
+        current_number_files = len(os.listdir(data_folder_path))
+        logging.info(f"Number of files: {init_number_files} {current_number_files}")
+        if init_number_files != current_number_files:
+            for filename in os.listdir(data_folder_path):
+                try:
+                    file_path = os.path.join(data_folder_path, filename)
+                    text_content = textract.process(file_path)
+                    await rag.ainsert(text_content.decode("utf-8"))
+                except Exception as e:
+                    logging.error(
+                        f"Error processing file {filename}: {e}", exc_info=True
+                    )
+                    raise
+            init_number_files = current_number_files
+            logging.info("Processed Data Folder Done !!!")
+        else:
+            logging.info("Database is already up to date !!!")
 
-        mode = "hybrid"
-        print(
-            await rag.query(
-                "What are the top themes in this story?", param=QueryParam(mode=mode)
-            )
+        conversation_history = [
+            {
+                "role": "user",
+                "content": "What is the main character's attitude towards Christmas?",
+            },
+            {
+                "role": "assistant",
+                "content": "At the beginning of the story, Ebenezer Scrooge has a very negative attitude towards Christmas...",
+            },
+            {"role": "user", "content": "How does his attitude change?"},
+        ]
+
+        config_query = QueryParam(
+            mode="hybrid", conversation_history=conversation_history, stream=True
         )
-
+        prompt = input("User: ")
+        with token_tracker:
+            response = await rag.aquery(prompt, param=config_query)
+        result = ""
+        print("AI: ", end="")
+        async for chunk in response:
+            result += chunk
+            print(chunk, end="", flush=True)
     except Exception as e:
         print(f"An error occurred: {e}")
+        logging.error(f"Error occurred: {e}", exc_info=True)
     finally:
         if rag:
             await rag.finalize_storages()
